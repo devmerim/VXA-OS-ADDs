@@ -1,0 +1,131 @@
+#==============================================================================
+# ** Shadow_PS 
+#------------------------------------------------------------------------------
+# Requisitos:
+# - Shadow.png em Graphics/System
+#------------------------------------------------------------------------------
+# Funcionalidades:
+# - Player e eventos recebem sombra automaticamente.
+# - Para remover a sombra de um evento, adicione <noshadow> nos comentários.
+# - O script NÃO altera o [VS]Spriteset_Map nativamente (usa forma segura).
+# Autor: Merim
+#==============================================================================
+
+
+class Character_Shadow
+  def initialize(character, viewport)
+    @character = character
+    @shadow = Sprite.new(viewport)
+    begin
+      @shadow.bitmap = Cache.system("Shadow")
+      @shadow.ox = @shadow.bitmap.width / 2
+      @shadow.oy = @shadow.bitmap.height / 2 + 10
+    rescue
+      @shadow.bitmap = nil
+      @shadow.visible = false
+    end
+    @shadow.zoom_x = 0.7
+    @shadow.zoom_y = 0.7
+    @shadow.z = @character.screen_z - 1
+    update
+  end
+
+  def update
+    return dispose if disposed_conditions?
+    @shadow.x = @character.screen_x
+    @shadow.y = @character.screen_y
+    @shadow.visible = !@character.transparent
+  end
+
+  def dispose
+    @shadow.dispose if @shadow && !@shadow.disposed?
+    @shadow = nil
+  end
+
+  def disposed_conditions?
+    @character.nil? || @character.transparent || @shadow.bitmap.nil?
+  end
+end
+
+
+class Game_Event < Game_Character
+  attr_accessor :has_shadow
+
+  alias merim_shadow_initialize initialize
+  def initialize(map_id, event)
+    merim_shadow_initialize(map_id, event)
+    check_shadow_flag
+  end
+
+  alias merim_shadow_refresh refresh
+  def refresh
+    merim_shadow_refresh
+    check_shadow_flag
+  end
+
+  def check_shadow_flag
+    @has_shadow = true
+    return unless @page
+    @page.list.each do |cmd|
+      if (cmd.code == 108 || cmd.code == 408) && cmd.parameters[0].to_s.downcase.include?("<noshadow>")
+        @has_shadow = false
+        break
+      end
+    end
+  end
+end
+
+
+class Spriteset_Map
+  alias merim_shadow_create_characters create_characters
+  alias merim_shadow_update update
+  alias merim_shadow_dispose dispose
+
+  def create_characters
+    merim_shadow_create_characters
+    create_shadows
+    @last_map_id = $game_map.map_id
+  end
+
+  def create_shadows
+    dispose_shadows # evita duplicação
+    @character_shadows = []
+    all_chars = [$game_player] + $game_map.events.values
+    all_chars.each do |char|
+      next if char.is_a?(Game_Event) && char.has_shadow == false
+      @character_shadows << Character_Shadow.new(char, @viewport1)
+    end
+  end
+
+  def update
+    if $game_map.map_id != @last_map_id
+      create_shadows # se mudou o mapa, recria sombras
+      @last_map_id = $game_map.map_id
+    end
+    merim_shadow_update
+    update_shadows
+  end
+
+ def update_shadows
+  return unless @character_shadows
+  @character_shadows.each_with_index do |shadow, index|
+    if shadow.disposed_conditions?
+      shadow.dispose
+      @character_shadows.delete_at(index)
+    else
+      shadow.update
+    end
+  end
+end
+
+  def dispose
+    dispose_shadows
+    merim_shadow_dispose
+  end
+
+  def dispose_shadows
+    return unless @character_shadows
+    @character_shadows.each(&:dispose)
+    @character_shadows.clear
+  end
+end
