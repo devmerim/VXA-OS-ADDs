@@ -1,0 +1,66 @@
+Introdução 
+Esse trecho do script ajuda a colocar glifo abaixo do inimigo para mostrar visivelmente onde está o inimigo selecionado, adiciona uma área por imagem abaixo do inimigo
+Você pode usar como bem entender 
+
+no [VS]Spriteset_Map troque o def create_target por esse abaixo
+
+ def create_target
+  dispose_target
+  @last_target = $game_player.target
+  
+  # Criando o sprite do círculo usando a imagem "target_base"
+  @circle_sprite = Sprite.new(@viewport1)
+  @circle_sprite.bitmap = Cache.system("target_base")  # Carrega a imagem da área
+  @circle_sprite.ox = @circle_sprite.bitmap.width / 2
+  @circle_sprite.oy = @circle_sprite.bitmap.height / 2
+  
+  # Criando o sprite do Target
+  @target_sprite = Sprite.new(@viewport1)
+  @target_sprite.bitmap = Cache.system("Target")
+  @target_sprite.ox = @target_sprite.bitmap.width / 2
+  bitmap = Cache.character($game_player.target.character_name)
+  sign = $game_player.target.character_name[/^[\!\$]./]
+  ch = sign && sign.include?('$') ? bitmap.height / 4 : bitmap.height / 8
+  @target_sprite.oy = ch + 40
+  @target_sprite.z = $game_player.target.screen_z + 100
+  
+  update_circle_position  # Ajusta a posição inicial do círculo
+end
+
+def update_target
+  if $game_player.has_target? && $game_player.target.actor?
+    create_target unless @target_sprite && @last_target == $game_player.target
+    @target_sprite.x = $game_player.target.screen_x
+    @target_sprite.y = $game_player.target.screen_y
+    update_circle_position  # Mantém o círculo seguindo o alvo
+  else
+    dispose_target
+  end
+end
+
+def update_circle_position
+  return unless @circle_sprite && $game_player.target
+  @circle_sprite.x = $game_player.target.screen_x
+  @circle_sprite.y = $game_player.target.screen_y - 10  # Ajuste manual para subir ou descer a imagem target_base
+  @circle_sprite.z = @target_sprite.z - 1  # Mantém abaixo do alvo
+end
+
+no mesmo script troque o def dispose_target por esse abaixo
+
+def dispose_target
+  if @target_sprite
+    @target_sprite.bitmap.dispose
+    @target_sprite.dispose
+    @target_sprite = nil
+  end
+
+  if @circle_sprite  # Removendo a área
+    @circle_sprite.bitmap.dispose
+    @circle_sprite.dispose
+    @circle_sprite = nil
+  end
+
+  @last_target = nil
+end
+
+ Client\Graphics\System target_base.png
