@@ -1,0 +1,85 @@
+#==============================================================================
+# ** Sprite_Drop
+#------------------------------------------------------------------------------
+#  Esta classe lida com a exibição do drop.
+#  Precisa de imagem na pasta Client\Graphics\System tamanho 24x24 ''drop'' (bolha vazia)
+#  Extensão PNG
+#------------------------------------------------------------------------------
+#  Autor: Valentine  Mod: Merim
+#==============================================================================
+
+class Sprite_Drop < Sprite2
+  
+  attr_reader   :character
+  
+def initialize(viewport, character)
+  super(viewport)
+  @character = character
+  @float_phase = 0  # Variável para controle da flutuação
+  self.bitmap = Bitmap.new(24, 24)
+
+  # Carrega a imagem da bolha
+  bubble = Cache.system('drop')
+
+  # Carrega o ícone do item
+  iconset = Cache.system('Iconset')
+  rect = Rect.new(@character.icon_index % 16 * 24, @character.icon_index / 16 * 24, 24, 24)
+
+  # Desenha a bolha primeiro
+  self.bitmap.blt(0, 0, bubble, Rect.new(0, 0, 24, 24))
+
+  # Redimensiona o ícone do item para caber dentro da bolha
+  icon_resized = Bitmap.new(16, 16)  # Cria um novo bitmap menor
+  icon_resized.stretch_blt(Rect.new(0, 0, 16, 16), iconset, rect)  # Reduz o ícone para 16x16
+
+  # Desenha o ícone no centro da bolha
+  self.bitmap.blt(4, 4, icon_resized, Rect.new(0, 0, 16, 16))
+
+  create_name
+  update
+end
+  
+  def dispose
+    super
+    @name_sprite.bitmap.dispose
+    @name_sprite.dispose
+  end
+  
+  def visible=(visible)
+    super
+    @name_sprite.visible = visible
+  end
+  
+ def create_name
+  @name_sprite = Sprite.new
+  text_width = text_width(@character.name)  # Calcula o tamanho exato do texto
+  @name_sprite.bitmap = Bitmap.new(text_width, 15)
+  @name_sprite.bitmap.font.size = 15
+  color = @character.key_item? ? crisis_color : normal_color
+  @name_sprite.bitmap.font.color.set(color)
+
+  # Centraliza o texto corretamente
+  @name_sprite.bitmap.draw_text(@name_sprite.bitmap.rect, @character.name, 1)
+
+  @name_sprite.z = self.z + 50
+  @name_sprite.visible = false
+end
+
+  
+def update
+  super
+  @float_phase += 0.1
+  float_offset = Math.sin(@float_phase) * 5
+
+  self.x = (@character.real_x - $game_map.display_x) * 32
+  self.y = (@character.real_y - $game_map.display_y) * 32 + float_offset
+
+  # Ajusta a posição do nome do item
+  @name_sprite.x = self.x + 22 - (@name_sprite.bitmap.width / 2)
+  @name_sprite.y = self.y - 22  # Levanta um pouco para ficar perfeito
+
+  @name_sprite.visible = in_area? && !$dragging_window && !$cursor.object
+end
+
+  
+end
