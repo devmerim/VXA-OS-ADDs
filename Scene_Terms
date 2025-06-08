@@ -1,0 +1,196 @@
+#==============================================================================
+# ** Scene_Terms
+#------------------------------------------------------------------------------
+#  Esta classe lida com a tela de termos antes da tela de login.
+#------------------------------------------------------------------------------
+#  Autor: Merim
+#------------------------------------------------------------------------------
+# Requisitos:
+# Precisa de duas imagens uma na pasta Client\Graphics\Parallaxes ''TermsBackground''  
+# E outra na 
+# Pasta de Client\Graphics\Pictures ''Terms'' use extensão PNG
+#==============================================================================
+class Window_TermsText < Window_Base
+  attr_reader :image_height
+
+  def initialize(x, y, width, height, text, image_bitmap = nil)
+    super(x, y, width, height)
+    @text = text
+    @image_bitmap = image_bitmap
+    @font_size = 15
+    @line_height = @font_size + 4
+    @image_height = @image_bitmap ? @image_bitmap.height + 10 : 0
+    @max_lines = (height - 32 - @image_height - @line_height) / @line_height
+    @lines = []
+    process_text
+    @top_line = 0
+    refresh
+  end
+
+  def process_text
+    @lines = []
+    contents.font.size = @font_size
+    @text.split("\n").each do |line|
+      wrapped = word_wrap(line, contents.width - 32)
+      @lines.concat(wrapped)
+    end
+  end
+
+  def word_wrap(text, max_width)
+    words = text.split(' ')
+    lines = []
+    current_line = ''
+    words.each do |word|
+      test_line = current_line.empty? ? word : "#{current_line} #{word}"
+      if contents.text_size(test_line).width > max_width
+        lines << current_line
+        current_line = word
+      else
+        current_line = test_line
+      end
+    end
+    lines << current_line unless current_line.empty?
+    lines
+  end
+
+  def refresh
+    contents.clear
+
+    # Título
+    title = "Termos de Uso"
+    contents.font.size = 22
+    contents.font.bold = true
+    title_width = contents.text_size(title).width
+    contents.draw_text((contents.width - title_width) / 2, 0, title_width, line_height, title)
+    contents.font.bold = false
+
+    # Imagem abaixo do título
+    if @image_bitmap
+      contents.blt((contents.width - @image_bitmap.width) / 2, line_height, @image_bitmap, @image_bitmap.rect)
+    end
+
+    # Corpo do texto
+    contents.font.size = @font_size
+    y_offset = @image_height + line_height
+    visible_lines = @lines[@top_line, @max_lines] || []
+    visible_lines.each_with_index do |line, i|
+      draw_text(4, y_offset + i * @line_height, contents.width - 8, @line_height, line)
+    end
+  end
+
+  def update
+    super
+    if Input.repeat?(Input::DOWN)
+      scroll_down
+    elsif Input.repeat?(Input::UP)
+      scroll_up
+    end
+  end
+
+  def scroll_down
+    if @top_line + @max_lines < @lines.size
+      @top_line += 1
+      refresh
+      Sound.play_cursor
+    end
+  end
+
+  def scroll_up
+    if @top_line > 0
+      @top_line -= 1
+      refresh
+      Sound.play_cursor
+    end
+  end
+end
+
+class Window_TermsCommand < Window_Command
+  def initialize(x, y)
+    super(x, y)
+    self.width = 240
+    self.height = fitting_height(2)
+    self.opacity = 220
+    self.back_opacity = 160
+    self.windowskin = Cache.system("Window")
+  end
+
+  def window_width
+    240
+  end
+
+  def make_command_list
+    add_command("Aceito", :accept)
+    add_command("Recusar", :decline)
+  end
+end
+
+class Scene_Terms < Scene_Base
+  TERMS_TEXT = "Bem-vindo ao nosso jogo!\n\n" +
+    "Antes de prosseguir, por favor leia atentamente os termos de uso abaixo.\n\n" +
+    "1. Você concorda em jogar seguindo as regras da comunidade.\n" +
+    "2. É proibido uso de cheats, bots ou qualquer forma de trapaça.\n" +
+    "3. Respeite os outros jogadores.\n" +
+    "4. O jogo pode coletar dados para melhorar a experiência, conforme política de privacidade.\n" +
+    "5. O descumprimento pode resultar em banimento.\n\n" +
+    "Use as setas para cima e para baixo para rolar este texto.\n\n" +
+    "Ao clicar em \"Aceito\", você concorda com estes termos e será levado à tela de login.\n" +
+    "Se clicar em \"Recusar\", o jogo será fechado.\n\n" +
+    "Obrigado por jogar!"
+
+  def start
+    super
+    $cursor.visible = true # Exibe o cursor
+    create_background
+    create_windows
+  end
+
+  def create_background
+    @background_sprite = Sprite.new
+    @background_sprite.bitmap = Cache.parallax("TermsBackground")
+  end
+
+  def create_windows
+    image_bitmap = Cache.picture("Terms")
+    win_width = 600
+    win_height = 400
+    win_x = (Graphics.width - win_width) / 2
+    win_y = (Graphics.height - win_height) / 2
+
+    @terms_window = Window_TermsText.new(win_x, win_y, win_width, win_height, TERMS_TEXT, image_bitmap)
+
+    cmd_x = (Graphics.width - 240) / 2
+    cmd_y = win_y + win_height + 10
+
+    @command_window = Window_TermsCommand.new(cmd_x, cmd_y)
+    @command_window.set_handler(:accept, method(:on_accept))
+    @command_window.set_handler(:decline, method(:on_decline))
+    @command_window.activate
+  end
+
+  def update
+    super
+    @command_window.update
+    @terms_window.update
+  end
+
+  def on_accept
+    Sound.play_ok
+    SceneManager.call(Scene_Login) # Altere para a cena desejada
+  end
+
+  def on_decline
+    Sound.play_buzzer
+    close_game
+  end
+
+  def close_game
+    exit
+  end
+
+  def terminate
+    super
+    @terms_window.dispose
+    @command_window.dispose
+    @background_sprite.dispose if @background_sprite
+  end
+end
