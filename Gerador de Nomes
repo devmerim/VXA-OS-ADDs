@@ -1,0 +1,26 @@
+Introdução
+
+
+Cria um botão que gera nomes aleatórios para personagens
+Você define a lista de nomes por lista 
+Não duplica nomes pois o servidor trata dos nomes salva no banco de dados 
+
+
+Modificação
+
+
+No [VS]Window_CreateChar adicione essa linha após create_buttons antes do end no def initialize (bem no começo)
+
+Código:
+@random_name = Button.new(self, 100, 254, "Aleatório", 64) { generate_random_name }
+
+No [VS] Window_CreateChar adicione esse modulo após o def initialize
+
+Código:
+def generate_random_name
+  names = ["Kael", "Liora", "Thorin", "Aeris", "Mira", "Zarek"] # Aqui você cria a lista de nomes
+  @name_box.text = names.sample
+  enable_create_button
+end
+
+Fique a vontade para adicionar quantos nomes quiser 
