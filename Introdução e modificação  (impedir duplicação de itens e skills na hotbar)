@@ -1,0 +1,25 @@
+ Introdução
+
+
+Não deixa duplicar itens e nem skills na hotbar
+
+No [VS] Sprite_Hotbar troque todo o  metodo if $game_actors[1].hotbar.include?($cursor.object)
+por esse abaixo:
+
+Esse metodo fica após def update_drop
+Código:
+    # Impede duplicação Merim_add
+    if $game_actors[1].hotbar.include?($cursor.object)
+      puts "Item já está na hotbar: #{$cursor.object.name}"
+      Sound.play_buzzer #Som
+      return
+    end
+
+    $game_actors[1].hotbar.each_index do |i|
+      next unless in_area?(slot_width * i, 0, slot_width, slot_height)
+      puts "Tentando adicionar à hotbar no slot #{i} | Item: #{$cursor.object.name}, ID: #{$cursor.object.id}"
+      $network.send_player_hotbar(i, $cursor.type, $cursor.object.id)
+      puts "Item adicionado ao slot #{i}" if $game_actors[1].hotbar[i] == $cursor.object
+      break
+    end
+  end
