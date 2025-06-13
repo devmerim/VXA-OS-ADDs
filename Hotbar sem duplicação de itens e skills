@@ -1,0 +1,186 @@
+#==============================================================================
+# ** Sprite_Hotbar
+#------------------------------------------------------------------------------
+# Esta classe lida com a exibição dos atalhos.
+#------------------------------------------------------------------------------
+# Autor: Valentine
+#==============================================================================
+class Sprite_Hotbar < Sprite2
+  def initialize
+    super
+    self.bitmap = Bitmap.new(308, 40)
+    self.x = adjust_x
+    self.y = adjust_y
+    self.z = 50
+    @back = Cache.system('Hotbar')
+    @iconset = Cache.system('Iconset')
+    @dragable = true
+    @last_item = nil
+    create_desc
+    refresh
+    change_opacity
+    @counter = 0
+    @bars = Array.new(9) { Sprite.new } # Placeholder se usar barras de cooldown
+  end
+
+  def adjust_x
+    Graphics.width / 2 - 94
+  end
+
+  def adjust_y
+    Graphics.height - 120
+  end
+
+  def slot_width
+    34
+  end
+
+  def slot_height
+    40
+  end
+
+  def item?
+    return false if $cursor.object.nil?
+    return true if $cursor.object.is_a?(RPG::Skill)
+    return false unless $cursor.object.is_a?(RPG::Item)
+    return false unless $cursor.type == Enums::Mouse::ITEM
+    return false unless $cursor.object.consumable
+    true
+  end
+
+  def create_desc
+    @desc_sprite = Sprite_Desc.new
+    @desc_sprite.z = self.z + 100
+  end
+
+  def refresh
+    draw_background
+    draw_items
+    puts "Hotbar atualizada. Itens: #{$game_actors[1].hotbar.map { |item| item ? item.name : 'Vazio' }}"
+  end
+
+  def draw_background
+    self.bitmap.clear
+    self.bitmap.blt(0, 0, @back, self.bitmap.rect)
+  end
+
+  def draw_items
+    $game_actors[1].hotbar.each_with_index do |item, i|
+      next unless item
+      draw_icon(item, i)
+      self.bitmap.draw_text(slot_width * i + 5, 4, slot_width, 18, i + 1)
+    end
+  end
+
+  def draw_icon(item, index)
+    rect = Rect.new(item.icon_index % 16 * 24, item.icon_index / 16 * 24, 24, 24)
+    item_enable = item.is_a?(RPG::Item) && $game_party.has_item?(item)
+    skill_enable = item.is_a?(RPG::Skill) && $game_actors[1].skills.include?(item)
+    opacity = item_enable || skill_enable ? 255 : 160
+    self.bitmap.blt(slot_width * index + 6, 7, @iconset, rect, opacity)
+    if item.is_a?(RPG::Item)
+      self.bitmap.draw_text(slot_width * index, 19, slot_width, 18, $game_party.item_number(item), 2)
+    end
+  end
+
+  def show_desc(item)
+    return if @last_item == item
+    target = $game_actors[1]
+    @desc_sprite.refresh(item, target)
+    @last_item = item
+  end
+
+  def hide_desc
+    @desc_sprite.visible = false
+    @last_item = nil
+  end
+
+  def toggle_visibility
+    self.visible = !self.visible
+    puts self.visible ? "Hotbar exibida" : "Hotbar oculta"
+  end
+
+  def update
+    super
+    change_opacity
+    update_drop
+    remove_item
+    update_desc
+    update_cooldown
+
+    if Input.trigger?(:P)
+      toggle_visibility
+    end
+  end
+
+  def update_drop
+    return if Mouse.press?(:L)
+    return unless item? && $cursor.object
+
+    # Impede duplicação
+    if $game_actors[1].hotbar.include?($cursor.object)
+      puts "Item já está na hotbar: #{$cursor.object.name}"
+      Sound.play_buzzer
+      return
+    end
+
+    $game_actors[1].hotbar.each_index do |i|
+      next unless in_area?(slot_width * i, 0, slot_width, slot_height)
+      puts "Tentando adicionar à hotbar no slot #{i} | Item: #{$cursor.object.name}, ID: #{$cursor.object.id}"
+      $network.send_player_hotbar(i, $cursor.type, $cursor.object.id)
+      puts "Item adicionado ao slot #{i}" if $game_actors[1].hotbar[i] == $cursor.object
+      break 
+    end
+  end
+
+def update_cooldown
+  return if $game_actors[1].skills_cooldown_time.empty?
+  @counter += 1
+  cooldown_finished = false
+
+  if @counter >= 20
+    $game_actors[1].hotbar.each_with_index do |item, i|
+      next unless item.is_a?(RPG::Skill)
+      next unless $game_actors[1].skills_cooldown_time.has_key?(item.id)
+
+      time = $game_actors[1].skills_cooldown_time[item.id] - Time.now
+      pr = time / item.cooldown.to_f
+      @bars[i].src_rect.width = pr * 22 if @bars[i]
+
+      if $game_actors[1].skills_cooldown_time[item.id] < Time.now + 0.1
+        $game_actors[1].skills_cooldown_time.delete(item.id)
+        @counter = 19
+        cooldown_finished = true
+      end
+    end
+    @counter = 0
+  end
+
+  refresh if cooldown_finished
+end
+
+  def remove_item
+    return unless Mouse.click?(:R) && !$cursor.object
+    $game_actors[1].hotbar.each_with_index do |item, i|
+      next unless in_area?(slot_width * i, 0, slot_width, slot_height) && item
+      puts "Removendo item do slot #{i}: #{item.name}"
+      $network.send_player_hotbar(i, Enums::Hotbar::NONE, 0)
+      break
+    end
+  end
+
+  def update_desc
+    index = -1
+    $game_actors[1].hotbar.each_with_index do |item, i|
+      next unless in_area?(slot_width * i, 0, slot_width, slot_height) && item
+      index = i
+      break
+    end
+
+    if index >= 0 && !$cursor.object && !$dragging_window
+      show_desc($game_actors[1].hotbar[index])
+    else
+      hide_desc
+    end
+  end
+end
