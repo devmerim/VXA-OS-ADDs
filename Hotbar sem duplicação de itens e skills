@@ -86,7 +86,7 @@ class Sprite_Hotbar < Sprite2
   def show_desc(item)
     return if @last_item == item
     target = $game_actors[1]
-    @desc_sprite.refresh(item, target)
+    @desc_sprite.refresh(item, target) #se der erro aqui para você tire o target
     @last_item = item
   end
 
